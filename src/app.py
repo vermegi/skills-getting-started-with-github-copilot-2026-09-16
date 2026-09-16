@@ -140,15 +140,15 @@ def unregister_participant(activity_name: str, email: str):
 
     activity = activities[activity_name]
 
-    # Allow a waitlisted student to withdraw their request
-    if email in activity["waitlist"]:
-        activity["waitlist"].remove(email)
-        return {
-            "message": f"Removed {email} from the waitlist for {activity_name}",
-            "status": "removed_from_waitlist",
-        }
-
     if email not in activity["participants"]:
+        # Allow a waitlisted student to withdraw their request
+        if email in activity["waitlist"]:
+            activity["waitlist"].remove(email)
+            return {
+                "message": f"Removed {email} from the waitlist for {activity_name}",
+                "status": "removed_from_waitlist",
+            }
+
         raise HTTPException(status_code=400, detail="Student is not signed up for this activity")
 
     activity["participants"].remove(email)

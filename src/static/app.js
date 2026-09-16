@@ -28,7 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
               (email) => `
                   <li class="participant-item">
                     <span>${email}</span>
-                    <button type="button" class="delete-participant" data-activity="${name}" data-email="${email}" aria-label="Remove ${email} from ${type === "waitlist" ? "the waitlist of" : ""} ${name}">
+                    <button type="button" class="delete-participant" data-activity="${name}" data-email="${email}" aria-label="Remove ${email} from ${type === "waitlist" ? `the waitlist of ${name}` : name}">
                       🗑️
                     </button>
                   </li>
