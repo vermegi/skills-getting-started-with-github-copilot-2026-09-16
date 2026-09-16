@@ -1,17 +1,34 @@
 document.addEventListener("DOMContentLoaded", () => {
   const activitiesList = document.getElementById("activities-list");
   const activitySelect = document.getElementById("activity");
+  const activitySearch = document.getElementById("activity-search");
+  const scheduleFilter = document.getElementById("schedule-filter");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
 
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
-      const response = await fetch("/activities");
+      const query = new URLSearchParams();
+      if (activitySearch.value) query.set("search", activitySearch.value);
+      if (scheduleFilter.value) query.set("schedule", scheduleFilter.value);
+      const response = await fetch(`/activities?${query}`);
       const activities = await response.json();
 
       // Clear loading message
       activitiesList.innerHTML = "";
+      activitySelect.length = 1;
+
+      if (scheduleFilter.options.length === 1) {
+        [...new Set(Object.values(activities).map(({ schedule }) => schedule))]
+          .sort()
+          .forEach((schedule) => {
+            const option = document.createElement("option");
+            option.value = schedule;
+            option.textContent = schedule;
+            scheduleFilter.appendChild(option);
+          });
+      }
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -80,6 +97,9 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Error signing up:", error);
     }
   });
+
+  activitySearch.addEventListener("input", fetchActivities);
+  scheduleFilter.addEventListener("change", fetchActivities);
 
   // Initialize app
   fetchActivities();
