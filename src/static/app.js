@@ -5,6 +5,21 @@ document.addEventListener("DOMContentLoaded", () => {
   const scheduleFilter = document.getElementById("schedule-filter");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
+  const SEARCH_DEBOUNCE_MS = 300;
+
+  async function populateScheduleOptions() {
+    const response = await fetch("/activities");
+    const activities = await response.json();
+
+    [...new Set(Object.values(activities).map(({ schedule }) => schedule))]
+      .sort()
+      .forEach((schedule) => {
+        const option = document.createElement("option");
+        option.value = schedule;
+        option.textContent = schedule;
+        scheduleFilter.appendChild(option);
+      });
+  }
 
   // Function to fetch activities from API
   async function fetchActivities() {
@@ -18,19 +33,6 @@ document.addEventListener("DOMContentLoaded", () => {
       // Clear loading message
       activitiesList.innerHTML = "";
       activitySelect.length = 1;
-
-      if (scheduleFilter.options.length === 1) {
-        const allActivitiesResponse = await fetch("/activities");
-        const allActivities = await allActivitiesResponse.json();
-        [...new Set(Object.values(allActivities).map(({ schedule }) => schedule))]
-          .sort()
-          .forEach((schedule) => {
-            const option = document.createElement("option");
-            option.value = schedule;
-            option.textContent = schedule;
-            scheduleFilter.appendChild(option);
-          });
-      }
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -103,10 +105,12 @@ document.addEventListener("DOMContentLoaded", () => {
   let searchTimeout;
   activitySearch.addEventListener("input", () => {
     clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(fetchActivities, 300);
+    searchTimeout = setTimeout(fetchActivities, SEARCH_DEBOUNCE_MS);
   });
   scheduleFilter.addEventListener("change", fetchActivities);
 
   // Initialize app
-  fetchActivities();
+  populateScheduleOptions()
+    .catch((error) => console.error("Error loading schedules:", error))
+    .finally(fetchActivities);
 });

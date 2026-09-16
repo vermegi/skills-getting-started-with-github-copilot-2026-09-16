@@ -5,11 +5,25 @@ from src.app import app
 client = TestClient(app)
 
 
+def test_get_activities_returns_all_activities_without_filters():
+    response = client.get("/activities")
+
+    assert response.status_code == 200
+    assert len(response.json()) == 3
+
+
 def test_get_activities_filters_by_search_term():
     response = client.get("/activities", params={"search": "software"})
 
     assert response.status_code == 200
     assert list(response.json()) == ["Programming Class"]
+
+
+def test_get_activities_returns_empty_result_when_nothing_matches():
+    response = client.get("/activities", params={"search": "pottery"})
+
+    assert response.status_code == 200
+    assert response.json() == {}
 
 
 def test_get_activities_filters_by_schedule_case_insensitively():
