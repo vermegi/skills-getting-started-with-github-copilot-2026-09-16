@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from src.app import app
+from src.app import activities, app
 
 client = TestClient(app)
 
@@ -9,7 +9,7 @@ def test_get_activities_returns_all_activities_without_filters():
     response = client.get("/activities")
 
     assert response.status_code == 200
-    assert len(response.json()) == 3
+    assert response.json().keys() == activities.keys()
 
 
 def test_get_activities_filters_by_search_term():

@@ -7,10 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const messageDiv = document.getElementById("message");
   const SEARCH_DEBOUNCE_MS = 300;
 
-  async function populateScheduleOptions() {
-    const response = await fetch("/activities");
-    const activities = await response.json();
-
+  function populateScheduleOptions(activities) {
     [...new Set(Object.values(activities).map(({ schedule }) => schedule))]
       .sort()
       .forEach((schedule) => {
@@ -21,6 +18,40 @@ document.addEventListener("DOMContentLoaded", () => {
       });
   }
 
+  function displayActivities(activities) {
+    // Clear loading message
+    activitiesList.innerHTML = "";
+    activitySelect.length = 1;
+
+    // Populate activities list
+    Object.entries(activities).forEach(([name, details]) => {
+      const activityCard = document.createElement("div");
+      activityCard.className = "activity-card";
+
+      const spotsLeft = details.max_participants - details.participants.length;
+
+      activityCard.innerHTML = `
+          <h4>${name}</h4>
+          <p>${details.description}</p>
+          <p><strong>Schedule:</strong> ${details.schedule}</p>
+          <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+        `;
+
+      activitiesList.appendChild(activityCard);
+
+      // Add option to select dropdown
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      activitySelect.appendChild(option);
+    });
+  }
+
+  function showActivityLoadError(error) {
+    activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
+    console.error("Error fetching activities:", error);
+  }
+
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
@@ -28,37 +59,20 @@ document.addEventListener("DOMContentLoaded", () => {
       if (activitySearch.value) query.set("search", activitySearch.value);
       if (scheduleFilter.value) query.set("schedule", scheduleFilter.value);
       const response = await fetch(`/activities?${query}`);
-      const activities = await response.json();
-
-      // Clear loading message
-      activitiesList.innerHTML = "";
-      activitySelect.length = 1;
-
-      // Populate activities list
-      Object.entries(activities).forEach(([name, details]) => {
-        const activityCard = document.createElement("div");
-        activityCard.className = "activity-card";
-
-        const spotsLeft = details.max_participants - details.participants.length;
-
-        activityCard.innerHTML = `
-          <h4>${name}</h4>
-          <p>${details.description}</p>
-          <p><strong>Schedule:</strong> ${details.schedule}</p>
-          <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
-        `;
-
-        activitiesList.appendChild(activityCard);
-
-        // Add option to select dropdown
-        const option = document.createElement("option");
-        option.value = name;
-        option.textContent = name;
-        activitySelect.appendChild(option);
-      });
+      displayActivities(await response.json());
     } catch (error) {
-      activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
-      console.error("Error fetching activities:", error);
+      showActivityLoadError(error);
+    }
+  }
+
+  async function initializeActivities() {
+    try {
+      const response = await fetch("/activities");
+      const activities = await response.json();
+      populateScheduleOptions(activities);
+      displayActivities(activities);
+    } catch (error) {
+      showActivityLoadError(error);
     }
   }
 
@@ -110,7 +124,5 @@ document.addEventListener("DOMContentLoaded", () => {
   scheduleFilter.addEventListener("change", fetchActivities);
 
   // Initialize app
-  populateScheduleOptions()
-    .catch((error) => console.error("Error loading schedules:", error))
-    .finally(fetchActivities);
+  initializeActivities();
 });
