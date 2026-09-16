@@ -97,68 +97,68 @@ def get_activities():
     return activities
 
 
-@app.post("/activities/{activity_name}/signup")
-def signup_for_activity(activity_name: str, email: str):
-    """Sign up a student for an activity"""
-    # Validate activity exists
+def get_activity(activity_name: str):
+    """Return the activity or raise a 404 when it does not exist"""
     if activity_name not in activities:
         raise HTTPException(status_code=404, detail="Activity not found")
+    return activities[activity_name]
 
-    # Get the specific activity
-    activity = activities[activity_name]
 
-    # Check if the student is already signed up
-    if email in activity["participants"]:
-        raise HTTPException(status_code=400, detail="Student already signed up for this activity")
+def is_participant(activity, email: str) -> bool:
+    return email in activity["participants"]
 
-    # Check if the student is already waiting for a spot
-    if email in activity["waitlist"]:
-        raise HTTPException(status_code=400, detail="Student already on the waitlist for this activity")
 
-    # If the activity is full, place the student on the waitlist
-    if len(activity["participants"]) >= activity["max_participants"]:
-        activity["waitlist"].append(email)
-        return {
-            "message": f"{activity_name} is full. Added {email} to the waitlist at position {len(activity['waitlist'])}",
-            "status": "waitlisted",
-            "waitlist_position": len(activity["waitlist"]),
-        }
+def is_waitlisted(activity, email: str) -> bool:
+    return email in activity["waitlist"]
 
-    # Add student
+
+def activity_is_full(activity) -> bool:
+    return len(activity["participants"]) >= activity["max_participants"]
+
+
+def add_to_activity(activity, email: str) -> None:
     activity["participants"].append(email)
+
+
+def remove_from_activity(activity, email: str) -> None:
+    activity["participants"].remove(email)
+
+
+def add_to_waitlist(activity, email: str) -> None:
+    activity["waitlist"].append(email)
+
+
+def remove_from_waitlist(activity, email: str) -> None:
+    activity["waitlist"].remove(email)
+
+
+def promote_first_waitlisted(activity):
+    """Move the first waitlisted student into the activity and return them"""
+    if not activity["waitlist"]:
+        return None
+
+    promoted = activity["waitlist"].pop(0)
+    add_to_activity(activity, promoted)
+    return promoted
+
+
+def signed_up_message(activity_name: str, email: str):
     return {
         "message": f"Signed up {email} for {activity_name}",
         "status": "registered",
     }
 
 
-@app.delete("/activities/{activity_name}/unregister")
-def unregister_participant(activity_name: str, email: str):
-    """Remove a student from an activity"""
-    if activity_name not in activities:
-        raise HTTPException(status_code=404, detail="Activity not found")
+def waitlisted_message(activity, activity_name: str, email: str):
+    position = activity["waitlist"].index(email) + 1
+    return {
+        "message": f"{activity_name} is full. Added {email} to the waitlist at position {position}",
+        "status": "waitlisted",
+        "waitlist_position": position,
+    }
 
-    activity = activities[activity_name]
 
-    if email not in activity["participants"]:
-        # Allow a waitlisted student to withdraw their request
-        if email in activity["waitlist"]:
-            activity["waitlist"].remove(email)
-            return {
-                "message": f"Removed {email} from the waitlist for {activity_name}",
-                "status": "removed_from_waitlist",
-            }
-
-        raise HTTPException(status_code=400, detail="Student is not signed up for this activity")
-
-    activity["participants"].remove(email)
-
-    # Auto-enroll the first waitlisted student, if any
-    promoted = None
-    if activity["waitlist"]:
-        promoted = activity["waitlist"].pop(0)
-        activity["participants"].append(promoted)
-
+def unregistered_message(activity_name: str, email: str, promoted):
     message = f"Unregistered {email} from {activity_name}"
     if promoted:
         message += f". {promoted} was moved from the waitlist into the activity"
@@ -168,3 +168,46 @@ def unregister_participant(activity_name: str, email: str):
         "status": "unregistered",
         "promoted": promoted,
     }
+
+
+def removed_from_waitlist_message(activity_name: str, email: str):
+    return {
+        "message": f"Removed {email} from the waitlist for {activity_name}",
+        "status": "removed_from_waitlist",
+    }
+
+
+@app.post("/activities/{activity_name}/signup")
+def signup_for_activity(activity_name: str, email: str):
+    """Sign up a student for an activity, or add them to its waitlist when full"""
+    activity = get_activity(activity_name)
+
+    if is_participant(activity, email):
+        raise HTTPException(status_code=400, detail="Student already signed up for this activity")
+
+    if is_waitlisted(activity, email):
+        raise HTTPException(status_code=400, detail="Student already on the waitlist for this activity")
+
+    if activity_is_full(activity):
+        add_to_waitlist(activity, email)
+        return waitlisted_message(activity, activity_name, email)
+
+    add_to_activity(activity, email)
+    return signed_up_message(activity_name, email)
+
+
+@app.delete("/activities/{activity_name}/unregister")
+def unregister_participant(activity_name: str, email: str):
+    """Remove a student from an activity or its waitlist"""
+    activity = get_activity(activity_name)
+
+    if not is_participant(activity, email):
+        if is_waitlisted(activity, email):
+            remove_from_waitlist(activity, email)
+            return removed_from_waitlist_message(activity_name, email)
+
+        raise HTTPException(status_code=400, detail="Student is not signed up for this activity")
+
+    remove_from_activity(activity, email)
+    promoted = promote_first_waitlisted(activity)
+    return unregistered_message(activity_name, email, promoted)
