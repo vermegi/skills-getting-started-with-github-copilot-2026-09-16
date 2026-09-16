@@ -48,8 +48,24 @@ def root():
 
 
 @app.get("/activities")
-def get_activities():
-    return activities
+def get_activities(search: str | None = None, schedule: str | None = None):
+    """Return activities matching the optional search and schedule filters."""
+    search_term = search.casefold() if search else None
+    schedule_term = schedule.casefold() if schedule else None
+
+    return {
+        name: details
+        for name, details in activities.items()
+        if (
+            not search_term
+            or search_term in name.casefold()
+            or search_term in details["description"].casefold()
+        )
+        and (
+            not schedule_term
+            or schedule_term in details["schedule"].casefold()
+        )
+    }
 
 
 @app.post("/activities/{activity_name}/signup")

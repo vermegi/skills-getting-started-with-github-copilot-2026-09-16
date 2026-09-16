@@ -1,0 +1,43 @@
+from fastapi.testclient import TestClient
+
+from src.app import activities, app
+
+client = TestClient(app)
+
+
+def test_get_activities_returns_all_activities_without_filters():
+    response = client.get("/activities")
+
+    assert response.status_code == 200
+    assert response.json().keys() == activities.keys()
+
+
+def test_get_activities_filters_by_search_term():
+    response = client.get("/activities", params={"search": "software"})
+
+    assert response.status_code == 200
+    assert list(response.json()) == ["Programming Class"]
+
+
+def test_get_activities_returns_empty_result_when_nothing_matches():
+    response = client.get("/activities", params={"search": "pottery"})
+
+    assert response.status_code == 200
+    assert response.json() == {}
+
+
+def test_get_activities_filters_by_schedule_case_insensitively():
+    response = client.get("/activities", params={"schedule": "FRIDAYS"})
+
+    assert response.status_code == 200
+    assert list(response.json()) == ["Chess Club", "Gym Class"]
+
+
+def test_get_activities_combines_search_and_schedule_filters():
+    response = client.get(
+        "/activities",
+        params={"search": "class", "schedule": "thursdays"},
+    )
+
+    assert response.status_code == 200
+    assert list(response.json()) == ["Programming Class"]

@@ -15,6 +15,18 @@
     <main>
       <section id="activities-container">
         <h3>Available Activities</h3>
+        <div class="filters">
+          <div class="form-group">
+            <label for="activity-search">Search activities:</label>
+            <input type="search" id="activity-search" placeholder="Name or description" />
+          </div>
+          <div class="form-group">
+            <label for="schedule-filter">Filter by schedule:</label>
+            <select id="schedule-filter">
+              <option value="">All schedules</option>
+            </select>
+          </div>
+        </div>
         <div id="activities-list">
           <!-- Activities will be loaded here -->
           <p>Loading activities...</p>
