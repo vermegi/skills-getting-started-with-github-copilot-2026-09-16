@@ -6,6 +6,8 @@ A super simple FastAPI application that allows students to view and sign up for 
 
 - View all available extracurricular activities
 - Sign up for activities
+- Automatic waitlist when an activity is full, with auto-enrollment of the first
+  waitlisted student when a participant unregisters
 
 ## Getting Started
 
@@ -30,7 +32,8 @@ A super simple FastAPI application that allows students to view and sign up for 
 | Method | Endpoint                                                          | Description                                                         |
 | ------ | ----------------------------------------------------------------- | ------------------------------------------------------------------- |
 | GET    | `/activities`                                                     | Get all activities with their details and current participant count |
-| POST   | `/activities/{activity_name}/signup?email=student@mergington.edu` | Sign up for an activity                                             |
+| POST   | `/activities/{activity_name}/signup?email=student@mergington.edu` | Sign up for an activity, or join its waitlist when it is full        |
+| DELETE | `/activities/{activity_name}/unregister?email=student@mergington.edu` | Unregister from an activity or leave its waitlist; the first waitlisted student is auto-enrolled |
 
 ## Data Model
 
@@ -42,6 +45,7 @@ The application uses a simple data model with meaningful identifiers:
    - Schedule
    - Maximum number of participants allowed
    - List of student emails who are signed up
+   - Ordered waitlist of student emails waiting for a spot
 
 2. **Students** - Uses email as identifier:
    - Name
