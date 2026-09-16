@@ -34,6 +34,7 @@ def test_get_activities_returns_activity_collection():
     assert response.status_code == 200
     assert expected_activity in response.json()
     assert "participants" in response.json()[expected_activity]
+    assert "waitlist" in response.json()[expected_activity]
 
 
 def test_signup_adds_student_to_activity():
@@ -47,6 +48,7 @@ def test_signup_adds_student_to_activity():
     # Assert
     assert response.status_code == 200
     assert response.json()["message"] == f"Signed up {email} for {activity_name}"
+    assert response.json()["status"] == "registered"
     assert email in activities[activity_name]["participants"]
 
 
@@ -76,27 +78,116 @@ def test_signup_rejects_duplicate_student():
     assert response.json()["detail"] == "Student already signed up for this activity"
 
 
-def test_signup_rejects_full_activity():
+def test_signup_waitlists_student_when_activity_is_full():
     # Arrange
     activity_name = "Science Club"
     original_participants = activities[activity_name]["participants"][:]
+    original_waitlist = activities[activity_name]["waitlist"][:]
     activities[activity_name]["participants"] = [
         f"student-{number}@mergington.edu"
         for number in range(activities[activity_name]["max_participants"])
     ]
+    activities[activity_name]["waitlist"] = []
+    email = "full-activity@mergington.edu"
 
     try:
         # Act
         response = client.post(
             f"/activities/{activity_name}/signup",
-            params={"email": "full-activity@mergington.edu"},
+            params={"email": email},
+        )
+
+        # Assert
+        assert response.status_code == 200
+        assert response.json()["status"] == "waitlisted"
+        assert response.json()["waitlist_position"] == 1
+        assert email in activities[activity_name]["waitlist"]
+        assert email not in activities[activity_name]["participants"]
+    finally:
+        activities[activity_name]["participants"] = original_participants
+        activities[activity_name]["waitlist"] = original_waitlist
+
+
+def test_signup_rejects_student_already_on_waitlist():
+    # Arrange
+    activity_name = "Science Club"
+    original_participants = activities[activity_name]["participants"][:]
+    original_waitlist = activities[activity_name]["waitlist"][:]
+    activities[activity_name]["participants"] = [
+        f"student-{number}@mergington.edu"
+        for number in range(activities[activity_name]["max_participants"])
+    ]
+    email = "duplicate-waitlist@mergington.edu"
+    activities[activity_name]["waitlist"] = [email]
+
+    try:
+        # Act
+        response = client.post(
+            f"/activities/{activity_name}/signup",
+            params={"email": email},
         )
 
         # Assert
         assert response.status_code == 400
-        assert response.json()["detail"] == "Activity is full"
+        assert response.json()["detail"] == "Student already on the waitlist for this activity"
     finally:
         activities[activity_name]["participants"] = original_participants
+        activities[activity_name]["waitlist"] = original_waitlist
+
+
+def test_unregister_promotes_first_waitlisted_student():
+    # Arrange
+    activity_name = "Basketball Team"
+    original_participants = activities[activity_name]["participants"][:]
+    original_waitlist = activities[activity_name]["waitlist"][:]
+    participants = [
+        f"player-{number}@mergington.edu"
+        for number in range(activities[activity_name]["max_participants"])
+    ]
+    activities[activity_name]["participants"] = participants[:]
+    activities[activity_name]["waitlist"] = [
+        "waiting-first@mergington.edu",
+        "waiting-second@mergington.edu",
+    ]
+
+    try:
+        # Act
+        response = client.delete(
+            f"/activities/{activity_name}/unregister",
+            params={"email": participants[0]},
+        )
+
+        # Assert
+        assert response.status_code == 200
+        assert response.json()["promoted"] == "waiting-first@mergington.edu"
+        assert "waiting-first@mergington.edu" in activities[activity_name]["participants"]
+        assert activities[activity_name]["waitlist"] == ["waiting-second@mergington.edu"]
+        assert participants[0] not in activities[activity_name]["participants"]
+    finally:
+        activities[activity_name]["participants"] = original_participants
+        activities[activity_name]["waitlist"] = original_waitlist
+
+
+def test_unregister_removes_student_from_waitlist():
+    # Arrange
+    activity_name = "Drama Club"
+    email = "waitlist-withdraw@mergington.edu"
+    original_waitlist = activities[activity_name]["waitlist"][:]
+    activities[activity_name]["waitlist"] = [email]
+
+    try:
+        # Act
+        response = client.delete(
+            f"/activities/{activity_name}/unregister",
+            params={"email": email},
+        )
+
+        # Assert
+        assert response.status_code == 200
+        assert response.json()["status"] == "removed_from_waitlist"
+        assert email not in activities[activity_name]["waitlist"]
+    finally:
+        activities[activity_name]["waitlist"] = original_waitlist
 
 
 def test_unregister_removes_student_from_activity():
@@ -114,6 +205,7 @@ def test_unregister_removes_student_from_activity():
     # Assert
     assert response.status_code == 200
     assert response.json()["message"] == f"Unregistered {email} from {activity_name}"
+    assert response.json()["promoted"] is None
     assert email not in activities[activity_name]["participants"]
 
 

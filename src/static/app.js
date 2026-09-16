@@ -21,25 +21,42 @@ document.addEventListener("DOMContentLoaded", () => {
         activityCard.className = "activity-card";
 
         const spotsLeft = details.max_participants - details.participants.length;
-        const participantsList = details.participants.length
-          ? details.participants
-              .map(
-                (email) => `
+        const waitlist = details.waitlist || [];
+        const renderPeople = (emails, type) =>
+          emails
+            .map(
+              (email) => `
                   <li class="participant-item">
                     <span>${email}</span>
-                    <button type="button" class="delete-participant" data-activity="${name}" data-email="${email}" aria-label="Remove ${email} from ${name}">
+                    <button type="button" class="delete-participant" data-activity="${name}" data-email="${email}" aria-label="Remove ${email} from ${type === "waitlist" ? `the waitlist of ${name}` : name}">
                       🗑️
                     </button>
                   </li>
                 `
-              )
-              .join("")
+            )
+            .join("");
+
+        const participantsList = details.participants.length
+          ? renderPeople(details.participants, "participants")
           : "<li class=\"participant-empty\">No participants yet</li>";
+
+        const waitlistSection = waitlist.length
+          ? `
+          <div class="participants waitlist">
+            <h5>Waitlist</h5>
+            <ul>${renderPeople(waitlist, "waitlist")}</ul>
+          </div>
+        `
+          : "";
 
         activityCard.innerHTML = `
           <div class="activity-header">
             <h4>${name}</h4>
-            <span class="availability-badge">${spotsLeft} spots left</span>
+            <span class="availability-badge${spotsLeft > 0 ? "" : " full"}">${
+              spotsLeft > 0
+                ? `${spotsLeft} spots left`
+                : `Full${waitlist.length ? ` · ${waitlist.length} waitlisted` : ""}`
+            }</span>
           </div>
           <p class="activity-description">${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
@@ -47,6 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <h5>Participants</h5>
             <ul>${participantsList}</ul>
           </div>
+          ${waitlistSection}
         `;
 
         activitiesList.appendChild(activityCard);
@@ -116,8 +134,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (response.ok) {
         messageDiv.textContent = result.message;
-        messageDiv.className = "success";
+        messageDiv.className = result.status === "waitlisted" ? "info" : "success";
         signupForm.reset();
+        await fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
